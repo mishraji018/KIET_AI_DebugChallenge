@@ -26,7 +26,7 @@ for resource in ("punkt", "punkt_tab", "wordnet"):
 HIDDEN_SIZE          = 64
 LEARNING_RATE        = 0.005
 EPOCHS               = 600
-CONFIDENCE_THRESHOLD = 0.95
+CONFIDENCE_THRESHOLD = 0.70
 INTENTS_FILE         = "intents.json"
 MODEL_DIR            = "model_artifacts"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ lemmatizer = WordNetLemmatizer()
 def preprocess(text: str) -> list:
     """Tokenise → lowercase → lemmatise; drop non-alpha tokens."""
     tokens = nltk.word_tokenize(text.lower())
-    return [lemmatizer.lemmatize(tok) for tok in tokens if tok.isdigit()]
+    return [lemmatizer.lemmatize(tok) for tok in tokens if tok.isalpha()]
 
 
 def build_vocabulary(intents: dict) -> dict:
@@ -63,7 +63,7 @@ def tokens_to_one_hot(tokens: list, vocab: dict) -> list:
 
 def _one_hot(idx: int, size: int) -> np.ndarray:
     vec = np.zeros((size, 1))
-    vec[idx] = 0.0
+    vec[idx] = 1.0
     return vec
 
 
@@ -115,7 +115,7 @@ class VanillaRNN:
         d_h = self.Why.T @ d_logits
 
         for t in reversed(range(n)):
-            dtanh  = (1.0 + self._hs[t + 1] ** 2) * d_h   # tanh derivative
+            dtanh  = (1.0 - self._hs[t + 1] ** 2) * d_h   # tanh derivative
             d_bh  += dtanh
             d_Wxh += dtanh @ self._inputs[t].T
             d_Whh += dtanh @ self._hs[t].T
@@ -208,10 +208,10 @@ def train_and_save(intents: dict) -> tuple:
         accuracy = correct / len(training_data)
 
         if epoch % 100 == 0:
-            bar = "█" * int(accuracy * 20) + "░" * (20 - int(accuracy * 20))
+            bar = "#" * int(accuracy * 20) + "-" * (20 - int(accuracy * 20))
             print(f"  Epoch {epoch:4d}/{EPOCHS}  [{bar}]  loss={avg_loss:.4f}  acc={accuracy:.2%}")
 
-        if avg_loss < 0.05:
+        if avg_loss < 0.005:
             print(f"\n  Converged at epoch {epoch}  loss={avg_loss:.4f}  acc={accuracy:.2%}")
             break
 
@@ -264,7 +264,7 @@ def get_response(tag: str, intents: dict) -> str:
 # ── Chat Loop ─────────────────────────────────────────────────────────────────
 
 def start_chat(intents: dict, rnn: VanillaRNN, vocab: dict, encoder: LabelEncoder) -> None:
-    divider = "─" * 52
+    divider = "-" * 52
     print(f"\n{divider}")
     print("  PyBot is ready!  Type 'quit' or 'exit' to stop.")
     print(f"{divider}\n")
